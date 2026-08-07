@@ -25,11 +25,17 @@ jobs:
           git remote add upstream https://github.com/dani-garcia/vaultwarden.git
           git fetch upstream main --prune
 
-          LOCAL_SHA="$(git rev-parse HEAD)"
           UPSTREAM_SHA="$(git rev-parse upstream/main)"
-          if [ "${LOCAL_SHA}" = "${UPSTREAM_SHA}" ]; then
+          if git merge-base --is-ancestor upstream/main HEAD; then
             echo "changed=false" >> "${GITHUB_OUTPUT}"
-            echo "No upstream changes detected."
+            echo "Upstream changes already merged."
+            exit 0
+          fi
+
+          EXISTING_TAG="$(git tag -l "upstream-*-${UPSTREAM_SHA:0:8}" | head -n 1)"
+          if [ -n "${EXISTING_TAG}" ]; then
+            echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "Tag already exists for this upstream commit: ${EXISTING_TAG}"
             exit 0
           fi
 
