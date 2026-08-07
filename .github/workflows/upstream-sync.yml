@@ -40,7 +40,9 @@ jobs:
           RELEASE_TAG="upstream-$(date -u +%Y%m%d-%H%M%S)-${UPSTREAM_SHA:0:8}"
           git tag -a "${RELEASE_TAG}" -m "Build upstream ${UPSTREAM_SHA}"
           git push origin "${RELEASE_TAG}"
-          GH_TOKEN="${{ github.token }}" gh workflow run release-binary.yml --ref "${RELEASE_TAG}"
+          GH_TOKEN="${{ github.token }}" gh workflow run release-binary.yml \
+            --repo "${GITHUB_REPOSITORY}" \
+            --ref "${RELEASE_TAG}"
           echo "release_tag=${RELEASE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "changed=true" >> "${GITHUB_OUTPUT}"
 
