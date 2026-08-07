@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - name: Checkout fork
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: true
@@ -23,18 +23,22 @@ jobs:
         id: sync
         run: |
           git remote add upstream https://github.com/dani-garcia/vaultwarden.git
-          git fetch upstream main --tags
+          git fetch upstream main --prune
 
           LOCAL_SHA="$(git rev-parse HEAD)"
           UPSTREAM_SHA="$(git rev-parse upstream/main)"
           if [ "${LOCAL_SHA}" = "${UPSTREAM_SHA}" ]; then
             echo "changed=false" >> "${GITHUB_OUTPUT}"
+            echo "No upstream changes detected."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git merge --no-edit upstream/main
+          git merge --no-edit upstream/main || {
+            echo "::error::Merge conflict detected. Resolve it manually on main."
+            exit 1
+          }
           git push origin HEAD:main
 
           RELEASE_TAG="upstream-$(date -u +%Y%m%d-%H%M%S)-${UPSTREAM_SHA:0:8}"
@@ -49,3 +53,7 @@ jobs:
       - name: Summary
         if: steps.sync.outputs.changed == 'true'
         run: echo "Fork synchronized with upstream; the release workflow will build the new binary."
+
+      - name: Notify on failure
+        if: failure()
+        run: echo "::error::Upstream synchronization failed. Check the job logs and resolve the issue manually."

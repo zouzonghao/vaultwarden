@@ -27,7 +27,7 @@ jobs:
       image: ghcr.io/blackdex/rust-musl:x86_64-musl-stable-1.97.1
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
           persist-credentials: false
