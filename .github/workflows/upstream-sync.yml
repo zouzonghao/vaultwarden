@@ -41,10 +41,38 @@ jobs:
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git merge --no-edit upstream/main || {
-            echo "::error::Merge conflict detected. Resolve it manually on main."
+          # This fork intentionally deletes all upstream workflow files. Whenever
+          # upstream modifies them, git merge hits modify/delete conflicts that
+          # recur on every sync — resolve them automatically by keeping our
+          # deletion. Conflicts outside .github/workflows/ still fail loudly.
+          if ! git merge --no-edit upstream/main; then
+            CONFLICTS="$(git diff --name-only --diff-filter=U)"
+            echo "Unmerged paths: ${CONFLICTS}"
+            if echo "${CONFLICTS}" | grep -qv '^\.github/workflows/'; then
+              echo "::error::Merge conflict outside .github/workflows/ — resolve manually on main."
+              exit 1
+            fi
+            echo "${CONFLICTS}" | xargs -r git rm -qf --
+          fi
+
+          # The merge can also re-introduce or newly add upstream workflow
+          # files; drop everything except the two fork-owned workflows.
+          git ls-tree -r --name-only upstream/main -- .github/workflows \
+            | grep -Ev '^\.github/workflows/(upstream-sync|release-binary)\.yml$' \
+            | xargs -r git rm -qf --ignore-unmatch
+
+          if [ -n "$(git ls-files -u)" ]; then
+            echo "::error::Unresolved merge conflicts remain — resolve manually on main."
+            git status
             exit 1
-          }
+          fi
+
+          if git rev-parse -q --verify MERGE_HEAD >/dev/null; then
+            git commit --no-edit
+          elif ! git diff --cached --quiet; then
+            git commit -m "chore(sync): drop upstream workflow files"
+          fi
+
           git push origin HEAD:main
 
           RELEASE_TAG="upstream-$(date -u +%Y%m%d-%H%M%S)-${UPSTREAM_SHA:0:8}"
